@@ -1,35 +1,39 @@
 services:
-  minio:
-    # MinIO stopped publishing community images in late 2025; pin the last release
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    command: server /data --console-address ":9001"
+  rustfs:
+    # S3-compatible object storage (open-source MinIO alternative)
+    image: rustfs/rustfs:1.0.2
     environment:
-      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      RUSTFS_ACCESS_KEY: ${AWS_ACCESS_KEY_ID:-rustfsadmin}
+      RUSTFS_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY:-rustfsadmin}
+      RUSTFS_CONSOLE_ENABLE: "true"
+    # Host ports shifted off 9000, which PHP-FPM commonly occupies on macOS
     ports:
-      - "9000:9000" # S3 API
-      - "9001:9001" # web console
+      - "9010:9000" # S3 API
+      - "9011:9001" # web console
     volumes:
-      - minio-data:/data
+      - rustfs-data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/health"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  minio-init:
-    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+  create-buckets:
+    image: amazon/aws-cli:2.38.1
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
     environment:
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-rustfsadmin}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-rustfsadmin}
+      AWS_DEFAULT_REGION: us-east-1
     entrypoint: >
       sh -c "
-      mc alias set local http://minio:9000 $$AWS_ACCESS_KEY_ID $$AWS_SECRET_ACCESS_KEY &&
-      mc mb --ignore-existing local/raw local/processed local/features
+      for b in raw processed features; do
+        aws --endpoint-url http://rustfs:9000 s3api head-bucket --bucket $$b 2>/dev/null ||
+        aws --endpoint-url http://rustfs:9000 s3 mb s3://$$b;
+      done
       "
 
 volumes:
-  minio-data:
+  rustfs-data:

@@ -14,7 +14,7 @@ zone_hourly_stats_source = FileSource(
     name="zone_hourly_stats_source",
     path="s3://features/zone_hourly_stats/",
     timestamp_field="event_timestamp",
-    s3_endpoint_override=os.environ.get("AWS_ENDPOINT_URL", "http://localhost:9000"),
+    s3_endpoint_override=os.environ.get("AWS_ENDPOINT_URL", "http://localhost:9010"),
 )
 
 zone_hourly_stats = FeatureView(

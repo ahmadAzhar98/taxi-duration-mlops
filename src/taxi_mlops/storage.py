@@ -1,4 +1,4 @@
-"""Thin helpers around S3-compatible object storage (MinIO locally)."""
+"""Thin helpers around S3-compatible object storage (RustFS locally)."""
 
 from functools import cache
 
